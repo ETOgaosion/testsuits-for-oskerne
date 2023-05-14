@@ -21,6 +21,7 @@ dd if=/dev/zero of=${IMAGE_FILE} bs=1M count=${IMAGE_SIZE}
 chown ${UID}:${GID} ${IMAGE_FILE}
 
 # 创建分区
+LOOP_DEV=$(sudo losetup -f)
 echo '
 o
 n
@@ -40,16 +41,17 @@ t
 c
 p
 w
-' | fdisk ${IMAGE_FILE} && sudo losetup -P /dev/loop30 ${IMAGE_FILE} && sudo fdisk -l /dev/loop30
-sudo mkfs.ext4 -j -F /dev/loop30p1
+' | fdisk ${IMAGE_FILE} && sudo losetup -P ${LOOP_DEV} ${IMAGE_FILE}
+sudo fdisk -l ${LOOP_DEV}
+sudo mkfs.ext4 ${LOOP_DEV}p1
 # /sbin/mkfs.ext4 -j -F ${IMAGE_FILE}
 
 # 模拟fat32格式的硬盘
-sudo mkfs.vfat -F 32 /dev/loop30p2
+sudo mkfs.vfat -F 32 ${LOOP_DEV}p2
 
 test -d mnt || mkdir mnt
 # mount -o loop ${IMAGE_FILE} mnt
-sudo mount /dev/loop30p1 mnt
+sudo mount ${LOOP_DEV}p1 mnt
 
 set +e
 
@@ -73,6 +75,22 @@ copy_libs() {
 #
 # configure root filesystem
 #
+if [ -d ${GCC_DIR}/sysroot/lib${ARCH/riscv/}/${ABI}/ ]; then
+    ABI_DIR=lib${ARCH/riscv/}/${ABI}
+else
+    ABI_DIR=lib
+fi
+LDSO_NAME=ld-linux-${ARCH}-${ABI}.so.1
+LDSO_TARGET=$(readlink ${GCC_DIR}/sysroot/lib/${LDSO_NAME})
+if [ -z "$LDSO_TARGET" ]; then
+    LDSO_TARGET=$LDSO_NAME
+fi
+echo "================="
+echo "${GCC_DIR}"
+echo "${ABI_DIR}"
+echo "${LDSO_NAME}"
+echo "${LDSO_TARGET}"
+echo "================="
 (
     set -e
 
@@ -97,13 +115,6 @@ copy_libs() {
     cp build/dropbear-${DROPBEAR_VERSION}/dropbear mnt/sbin/
 
     # copy libraries
-    if [ -d ${GCC_DIR}/sysroot/usr/lib${ARCH/riscv/}/${ABI}/ ]; then
-        ABI_DIR=lib${ARCH/riscv/}/${ABI}
-    else
-        ABI_DIR=lib
-    fi
-    LDSO_NAME=ld-linux-${ARCH}-${ABI}.so.1
-    LDSO_TARGET=$(readlink ${GCC_DIR}/sysroot/lib/${LDSO_NAME})
     mkdir -p mnt/${ABI_DIR}/
     copy_libs $(dirname ${GCC_DIR}/sysroot/lib/${LDSO_TARGET})/ mnt/${ABI_DIR}/
     copy_libs ${GCC_DIR}/sysroot/usr/${ABI_DIR}/ mnt/${ABI_DIR}/
@@ -131,7 +142,7 @@ copy_libs() {
 #
 if [[ $? -ne 0 ]]; then
     echo "*** failed to create ${IMAGE_FILE}"
-    rm -f ${IMAGE_FILE}
+    # rm -f ${IMAGE_FILE}
 else
     echo "+++ successfully created ${IMAGE_FILE}"
     ls -l ${IMAGE_FILE}
@@ -142,5 +153,5 @@ fi
 #
 sudo sync
 sudo umount mnt
-sudo losetup -d /dev/loop30
+sudo losetup -d ${LOOP_DEV}
 rmdir mnt

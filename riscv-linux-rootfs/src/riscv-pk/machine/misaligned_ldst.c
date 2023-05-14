@@ -10,6 +10,7 @@
 union byte_array {
   uint8_t bytes[8];
   uintptr_t intx;
+  uint32_t int32;
   uint64_t int64;
 };
 
@@ -19,7 +20,7 @@ void misaligned_load_trap(uintptr_t* regs, uintptr_t mcause, uintptr_t mepc)
   uintptr_t mstatus;
   insn_t insn = get_insn(mepc, &mstatus);
   uintptr_t npc = mepc + insn_len(insn);
-  uintptr_t addr = read_csr(mbadaddr);
+  uintptr_t addr = read_csr(mtval);
 
   int shift = 0, fp = 0, len;
   if ((insn & MASK_LW) == MATCH_LW)
@@ -64,19 +65,26 @@ void misaligned_load_trap(uintptr_t* regs, uintptr_t mcause, uintptr_t mepc)
 #  endif
 # endif
 #endif
-  else
+  else {
+    mcause = CAUSE_LOAD_ACCESS;
+    write_csr(mcause, mcause);
     return truly_illegal_insn(regs, mcause, mepc, mstatus, insn);
+  }
 
   val.int64 = 0;
   for (intptr_t i = 0; i < len; i++)
     val.bytes[i] = load_uint8_t((void *)(addr + i), mepc);
 
   if (!fp)
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     SET_RD(insn, regs, (intptr_t)val.intx << shift >> shift);
+#else
+    SET_RD(insn, regs, (intptr_t)val.intx >> shift);
+#endif
   else if (len == 8)
     SET_F64_RD(insn, regs, val.int64);
   else
-    SET_F32_RD(insn, regs, val.intx);
+    SET_F32_RD(insn, regs, val.int32);
 
   write_csr(mepc, npc);
 }
@@ -128,12 +136,20 @@ void misaligned_store_trap(uintptr_t* regs, uintptr_t mcause, uintptr_t mepc)
 #  endif
 # endif
 #endif
-  else
+  else {
+    mcause = CAUSE_STORE_ACCESS;
+    write_csr(mcause, mcause);
     return truly_illegal_insn(regs, mcause, mepc, mstatus, insn);
+  }
 
-  uintptr_t addr = read_csr(mbadaddr);
+  uintptr_t addr = read_csr(mtval);
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+  intptr_t offs = (len == 8? 0 : sizeof(val.intx) - len);
+#else
+  intptr_t offs = 0;
+#endif
   for (int i = 0; i < len; i++)
-    store_uint8_t((void *)(addr + i), val.bytes[i], mepc);
+    store_uint8_t((void *)(addr + i), val.bytes[offs + i], mepc);
 
   write_csr(mepc, npc);
 }

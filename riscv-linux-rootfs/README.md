@@ -17,6 +17,8 @@ ssh access to a RISC-V virtual machine.
 
 ## Build
 
+follow this [blog](https://risc-v-machines.readthedocs.io/en/latest/linux/simple/), use different compiler to compile apps and linux.
+
 The build process downloads busybox and dropbear, compiles them and prepares
 a root filesystem image to the file `riscv64-rootfs.bin`.
 
