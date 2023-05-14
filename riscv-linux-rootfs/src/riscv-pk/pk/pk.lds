@@ -12,9 +12,8 @@ SECTIONS
   /*--------------------------------------------------------------------*/
 
   /* Begining of code and text segment */
-  . = 0x80000000;
+  . = MEM_START;
   _ftext = .;
-  PROVIDE( eprol = . );
 
   .text :
   {
@@ -39,13 +38,12 @@ SECTIONS
   }
 
   /* End of code and read-only segment */
-  PROVIDE( etext = . );
+  . = ALIGN(0x1000);
   _etext = .;
 
   /*--------------------------------------------------------------------*/
   /* HTIF, isolated onto separate page                                  */
   /*--------------------------------------------------------------------*/
-  . = ALIGN(0x1000);
   .htif :
   {
     PROVIDE( __htif_base = . );
@@ -72,8 +70,7 @@ SECTIONS
   }
 
   /* End of initialized data segment */
-  . = ALIGN(4);
-  PROVIDE( edata = . );
+  . = ALIGN(16);
   _edata = .;
 
   /*--------------------------------------------------------------------*/
@@ -99,5 +96,6 @@ SECTIONS
     *(COMMON)
   }
 
+  . = ALIGN(0x1000);
   _end = .;
 }

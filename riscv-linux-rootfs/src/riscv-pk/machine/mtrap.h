@@ -43,18 +43,18 @@ typedef struct {
   volatile uint64_t* timecmp;
 
   volatile uint32_t* plic_m_thresh;
-  volatile uintptr_t* plic_m_ie;
+  volatile uint32_t* plic_m_ie;
   volatile uint32_t* plic_s_thresh;
-  volatile uintptr_t* plic_s_ie;
+  volatile uint32_t* plic_s_ie;
 } hls_t;
 
 #define MACHINE_STACK_TOP() ({ \
-  register uintptr_t sp asm ("sp"); \
-  (void*)((sp + RISCV_PGSIZE) & -RISCV_PGSIZE); })
+  uintptr_t sp = (uintptr_t)__builtin_frame_address(0) ; \
+  (char *)((sp + RISCV_PGSIZE) & -RISCV_PGSIZE); })
 
 // hart-local storage, at top of stack
 #define HLS() ((hls_t*)(MACHINE_STACK_TOP() - HLS_SIZE))
-#define OTHER_HLS(id) ((hls_t*)((void*)HLS() + RISCV_PGSIZE * ((id) - read_const_csr(mhartid))))
+#define OTHER_HLS(id) ((hls_t*)((char*)HLS() + RISCV_PGSIZE * ((id) - read_const_csr(mhartid))))
 
 hls_t* hls_init(uintptr_t hart_id);
 void parse_config_string();
@@ -65,6 +65,7 @@ void putstring(const char* s);
 #define assert(x) ({ if (!(x)) die("assertion failed: %s", #x); })
 #define die(str, ...) ({ printm("%s:%d: " str "\n", __FILE__, __LINE__, ##__VA_ARGS__); poweroff(-1); })
 
+void setup_pmp();
 void enter_supervisor_mode(void (*fn)(uintptr_t), uintptr_t arg0, uintptr_t arg1)
   __attribute__((noreturn));
 void enter_machine_mode(void (*fn)(uintptr_t, uintptr_t), uintptr_t arg0, uintptr_t arg1)

@@ -8,6 +8,7 @@
 #include "vm.h"
 #include "uart.h"
 #include "uart16550.h"
+#include "uart_litex.h"
 #include "finisher.h"
 #include "fdt.h"
 #include "unprivileged_memory.h"
@@ -27,6 +28,8 @@ static uintptr_t mcall_console_putchar(uint8_t ch)
     uart_putchar(ch);
   } else if (uart16550) {
     uart16550_putchar(ch);
+  } else if (uart_litex) {
+    uart_litex_putchar(ch);
   } else if (htif) {
     htif_console_putchar(ch);
   }
@@ -69,10 +72,12 @@ static uintptr_t mcall_console_getchar()
     return uart_getchar();
   } else if (uart16550) {
     return uart16550_getchar();
+  } else if (uart_litex) {
+    return uart_litex_getchar();
   } else if (htif) {
     return htif_console_getchar();
   } else {
-    return '\0';
+    return (uintptr_t)-1;
   }
 }
 
@@ -173,7 +178,7 @@ send_ipi:
 
 void redirect_trap(uintptr_t epc, uintptr_t mstatus, uintptr_t badaddr)
 {
-  write_csr(sbadaddr, badaddr);
+  write_csr(stval, badaddr);
   write_csr(sepc, epc);
   write_csr(scause, read_csr(mcause));
   write_csr(mepc, read_csr(stvec));
@@ -191,17 +196,33 @@ void redirect_trap(uintptr_t epc, uintptr_t mstatus, uintptr_t badaddr)
 
 void pmp_trap(uintptr_t* regs, uintptr_t mcause, uintptr_t mepc)
 {
-  redirect_trap(mepc, read_csr(mstatus), read_csr(mbadaddr));
+  redirect_trap(mepc, read_csr(mstatus), read_csr(mtval));
 }
 
-static void machine_page_fault(uintptr_t* regs, uintptr_t dummy, uintptr_t mepc)
+static void machine_page_fault(uintptr_t* regs, uintptr_t mcause, uintptr_t mepc)
 {
   // MPRV=1 iff this trap occurred while emulating an instruction on behalf
   // of a lower privilege level. In that case, a2=epc and a3=mstatus.
+  // a1 holds MPRV if emulating a load or store, or MPRV | MXR if loading
+  // an instruction from memory.  In the latter case, we should report an
+  // instruction fault instead of a load fault.
   if (read_csr(mstatus) & MSTATUS_MPRV) {
-    return redirect_trap(regs[12], regs[13], read_csr(mbadaddr));
+    if (regs[11] == (MSTATUS_MPRV | MSTATUS_MXR)) {
+      if (mcause == CAUSE_LOAD_PAGE_FAULT)
+        write_csr(mcause, CAUSE_FETCH_PAGE_FAULT);
+      else if (mcause == CAUSE_LOAD_ACCESS)
+        write_csr(mcause, CAUSE_FETCH_ACCESS);
+      else
+        goto fail;
+    } else if (regs[11] != MSTATUS_MPRV) {
+      goto fail;
+    }
+
+    return redirect_trap(regs[12], regs[13], read_csr(mtval));
   }
-  bad_trap(regs, dummy, mepc);
+
+fail:
+  bad_trap(regs, mcause, mepc);
 }
 
 void trap_from_machine_mode(uintptr_t* regs, uintptr_t dummy, uintptr_t mepc)
@@ -215,7 +236,7 @@ void trap_from_machine_mode(uintptr_t* regs, uintptr_t dummy, uintptr_t mepc)
     case CAUSE_FETCH_ACCESS:
     case CAUSE_LOAD_ACCESS:
     case CAUSE_STORE_ACCESS:
-      return machine_page_fault(regs, dummy, mepc);
+      return machine_page_fault(regs, mcause, mepc);
     default:
       bad_trap(regs, dummy, mepc);
   }
