@@ -1,0 +1,3 @@
+[submodule "preliminary/riscv-linux-rootfs/src/riscv-pk"]
+	path = preliminary/riscv-linux-rootfs/src/riscv-pk
+	url = git@github.com:ETOgaosion/riscv-pk.git
