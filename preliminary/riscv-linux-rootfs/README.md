@@ -42,6 +42,7 @@ which runs executes this command:
 
 ```
 sudo qemu-system-riscv64 -nographic -machine virt \
+  -bios none \
   -kernel bbl -append "root=/dev/vda ro console=ttyS0" \
   -drive file=riscv64-rootfs.bin,format=raw,id=hd0 \
   -device virtio-blk-device,drive=hd0 \
@@ -56,7 +57,9 @@ $ ssh root@192.168.100.2
 ```
 
 ## 运行syscalls测试用例
+
 用户名root密码oscomp登入Qemu虚拟机
+
 <br>
 `fdisk -l`可看到磁盘分区/dev/vda2是fat32格式，用于模拟比赛的sdcard fat32环境，
 请确认将此分区挂载到/mnt中；
