@@ -1,3 +1,6 @@
 [submodule "preliminary/riscv-linux-rootfs/src/riscv-pk"]
 	path = preliminary/riscv-linux-rootfs/src/riscv-pk
 	url = git@github.com:ETOgaosion/riscv-pk.git
+[submodule "final"]
+	path = final
+	url = https://github.com/oscomp/testsuits-for-oskernel.git
