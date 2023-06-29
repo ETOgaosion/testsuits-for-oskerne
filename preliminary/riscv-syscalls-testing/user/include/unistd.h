@@ -22,7 +22,7 @@ int exec(char *);
 int execve(const char *, char *const [], char *const []);
 int waitpid(int, int *, int);
 int64 get_time();
-int sys_get_time(TimeVal *ts, int tz); // syscall ID: 169; tz 表示时区，这里无需考虑，始终为0; 返回值：正确返回 0，错误返回 -1。
+long sys_get_time(TimeVal *ts, int tz); // syscall ID: 169; tz 表示时区，这里无需考虑，始终为0; 返回值：正确返回 0，错误返回 -1。
 int times(void *mytimes);
 int sleep(unsigned long long);
 int set_priority(int prio);
@@ -34,8 +34,8 @@ int mailread(void *buf, int len);
 int mailwrite(int pid, void *buf, int len);
 
 int fstat(int fd, struct kstat *st);
-int sys_linkat(int olddirfd, char *oldpath, int newdirfd, char *newpath, unsigned int flags);
-int sys_unlinkat(int dirfd, char *path, unsigned int flags);
+long sys_linkat(int olddirfd, char *oldpath, int newdirfd, char *newpath, unsigned int flags);
+long sys_unlinkat(int dirfd, char *path, unsigned int flags);
 int link(char *old_path, char *new_path);
 int unlink(char *path);
 int uname(void *buf);
